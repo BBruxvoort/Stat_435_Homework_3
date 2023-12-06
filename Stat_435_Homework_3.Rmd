@@ -1,0 +1,115 @@
+---
+title: "Stat 435 Homework 3"
+author: "Brian Bruxvoort"
+date: '2023-10-24'
+output:
+  html_document:
+    df_print: paged
+---
+
+# Question 1
+Question 1 is on the other attached document.
+
+# Question 4, Part a
+Independence is necessary for the O rings because we need to make sure that the o rings didn't have any relation to each other, and therefore didn't have any affect on temperature or any other variable. It would have been an issue if they were not independent it would affect the other variables and make our model unusable due to the amount of relationships between the variables. The authors additional analysis helped alleviate their worries. This was probably done by confirming the O rings where made in different facilities or that the machine was reset after each O ring was made. This would make sure that the O rings are independent and therefore would not cause an issue with the other variables.
+
+# Question 4, Part b
+```{r}
+challenger <- read.csv("challenger.csv")
+```
+
+```{r}
+mod.fit <- glm(O.ring/Number ~ Temp + Pressure, family = binomial(link = logit), data = challenger, weights=Number)
+summary(mod.fit)
+```
+
+
+
+# Question 4, Part c
+```{r, message=FALSE, warning=FALSE}
+library(package = car)
+Anova(mod = mod.fit, test = "LR")
+```
+
+# Question 4, Part d
+It makes sense that they removed Pressure from the model because it is not significant in the model with temperature. There could be an issue with removing it because it might make the model less accurate or it could relate to other variables that are not a part of the model. If more variables are added then the significance of pressure might change.
+
+
+# Question 5, Part a
+```{r}
+mod.fit2 <- glm(formula = O.ring/Number ~ Temp, family = binomial(link = logit), data = challenger, weights = Number)
+summary(mod.fit2)
+```
+
+# Question 5, Part b
+```{r}
+w <- aggregate(O.ring ~ Temp, data = challenger, FUN = sum)
+n <- aggregate(O.ring ~ Temp, data = challenger, FUN = length)
+w.n <- data.frame(Temp = w$Temp, success = w$O.ring, trails = n$O.ring, proportion = round(w$O.ring/n$O.ring, 4))
+head(w.n)
+```
+
+
+```{r}
+curve(expr = exp(mod.fit2$coefficients[1] + mod.fit2$coefficients[2] * x) / (1 + exp(mod.fit2$coefficients[1] + mod.fit2$coefficients[2] * x)), col = "red" , xlim = c(31, 81), ylab = expression(hat(pi)), xlab = "Temp", main = "Estimated probability of Failure vs Temp", panel.first = grid())
+
+curve(expr = 6*(exp(mod.fit2$coefficients[1] + mod.fit2$coefficients[2] * x) / (1 + exp(mod.fit2$coefficients[1] + mod.fit2$coefficients[2] * x))), col = "blue" , xlim = c(31, 81), ylab = "Expected Number of Failures", xlab = "Temp", main = "Expected Number of Failures vs Temp", panel.first = grid())
+```
+
+# Question 5, Part c
+```{r}
+ci.pi <- function(newdata, mod.fit.obj, alpha) {
+  linear.pred <- predict(object = mod.fit.obj, newdata = newdata, type = "link", se = TRUE)
+  CI.lin.pred.lower <- linear.pred$fit - qnorm(p = 1 - alpha/2) * linear.pred$se
+  CI.lin.pred.upper <- linear.pred$fit + qnorm(p = 1 - alpha/2) * linear.pred$se
+  CI.pi.lower <- exp(CI.lin.pred.lower) / (1 + exp(CI.lin.pred.lower))
+  CI.pi.upper <- exp(CI.lin.pred.upper) / (1 + exp(CI.lin.pred.upper))
+  list(lower = CI.pi.lower, upper = CI.pi.upper)
+}
+
+ci.pi(newdata = data.frame(Temp = 31), mod.fit.obj = mod.fit2, alpha = 0.05)
+
+curve(expr = exp(mod.fit2$coefficients[1] + mod.fit2$coefficients[2] * x) / (1 + exp(mod.fit2$coefficients[1] + mod.fit2$coefficients[2] * x)), col = "red" , xlim = c(31, 81), ylab = expression(hat(pi)), xlab = "Temp", main = "Estimated probability of Failure vs Temp", panel.first = grid())
+
+curve(expr = ci.pi(newdata = data.frame(Temp = x), mod.fit.obj = mod.fit2, alpha = 0.05)$lower, col = "blue", lty = "dotdash", add = TRUE, xlim = c(31, 81))
+
+curve(expr = ci.pi(newdata = data.frame(Temp = x), mod.fit.obj = mod.fit2, alpha = 0.05)$upper, col = "blue", lty = "dotdash", add = TRUE, xlim = c(31, 81))
+
+legend(x = 70, y = 0.6, legend = c("Logistic regression model", "95% individual C.I."), lty = c("solid", "dotdash"), col = c("red", "blue"), bty = "n")
+```
+
+
+# Question 5, Part d
+```{r}
+predict_data <- data.frame(Temp = 31)
+predict(object = mod.fit2, newdata = predict_data, type = "response")
+```
+
+```{r}
+alpha <- 0.05
+linear.pred <- predict(object = mod.fit2, newdata = predict_data, type = "link", se = TRUE)
+pi.hat <- exp(linear.pred$fit) / (1 + exp(linear.pred$fit))
+CI.lin.pred <- linear.pred$fit + qnorm(p = c(alpha/2, 1-alpha/2))*linear.pred$se
+CI.pi <- exp(CI.lin.pred) / (1 + exp(CI.lin.pred))
+
+round(data.frame(predict_data, pi.hat, lower = CI.pi[1], upper = CI.pi[2]), 4)
+```
+
+# Question 7, Part a
+We know that R is modeling the success or failure of a placekick because when R reads the glm() function with Good ~ Distance in it, then it automatically knows that it is calculating the ratios and probabilities of a kick being successful based on the distance.
+
+# Question 7, Part b
+```{r}
+placekick.BW <- read.csv("placekick.BW.csv")
+```
+
+```{r}
+placekick.BW$Good <- ifelse(placekick.BW$Good == 'Y', 1, 0)
+mod.fit3 <- glm(formula = Good ~ Distance, family = binomial(link = logit), data = placekick.BW)
+mod.fit3
+```
+
+```{r}
+curve(expr = exp(mod.fit3$coefficients[1] + mod.fit3$coefficients[2]*x) / (1 + exp(mod.fit3$coefficients[1] + mod.fit3$coefficients[2]*x)), col = "red", xlim = c(18, 66), ylab = expression(hat(pi)), xlab = "Distance", main = "Estimated Probability of Success for a Placekick")
+```
+
